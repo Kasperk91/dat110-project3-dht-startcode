@@ -84,6 +84,11 @@ public class StabilizationProtocols extends TimerTask {
 			logger.info("Stabilizing ring from "+chordnode.getNodeName()+"...");
 			
 			NodeInterface succ = chordnode.getSuccessor();						// get the successor of node
+			
+			 if (succ == null) {
+		            logger.info("Successor is null for node " + chordnode.getNodeName());
+		            return;
+		        }
 					
 			NodeInterface succnode = null;
 			NodeInterface predsucc = null;

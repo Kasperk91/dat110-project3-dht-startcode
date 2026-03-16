@@ -15,6 +15,7 @@ import java.security.NoSuchAlgorithmException;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
@@ -60,11 +61,18 @@ public class FileManager {
 	 	
 		// set a loop where size = numReplicas
 		
-		// replicate by adding the index to filename
+		for(int i = 0; i < numReplicas; i++) {
+			// replicate by adding the index to filename
+			String replicaName = filename + i;
+			
+			// hash the replica
+			BigInteger hash = Hash.hashOf(replicaName);
+			
+			// store the hash in the replicafiles array.
+			replicafiles[i] = hash;
+		}
 		
-		// hash the replica
-		
-		// store the hash in the replicafiles array.
+
 	}
 	
     /**
@@ -76,7 +84,7 @@ public class FileManager {
     	
     	// randomly appoint the primary server to this file replicas
     	Random rnd = new Random(); 							
-    	int index = rnd.nextInt(Util.numReplicas-1);
+    	int index = rnd.nextInt(numReplicas);
     	
     	int counter = 0;
 	
@@ -86,17 +94,34 @@ public class FileManager {
     	
     	// create replicas of the filename
     	
+    	createReplicaFiles();
+    	
 		// iterate over the replicas
     	
-    	// for each replica, find its successor (peer/node) by performing findSuccessor(replica)
+    	for(int i = 0; i < numReplicas; i++) {
+    		
+    		BigInteger replica = replicafiles[i];
+    		
+    		// for each replica, find its successor (peer/node) by performing findSuccessor(replica)
+    		NodeInterface successor = chordnode.findSuccessor(replica);
+    		
+    		// call the addKey on the successor and add the replica
+    		successor.addKey(replica);
+    		
+    		// implement a logic to decide if this successor should be assigned as the primary for the file
+    		boolean isPrimary = false;
+    		if(i == index) {
+    			isPrimary = true;
+    		}
+    		
+    		// call the saveFileContent() on the successor and set isPrimary=true if logic above is true otherwise set isPrimary=false
+    		successor.saveFileContent(filename, replica, bytesOfFile, isPrimary);
+    		
+    		// increment counter
+    		counter++;
+    	}
     	
-    	// call the addKey on the successor and add the replica
-		
-		// implement a logic to decide if this successor should be assigned as the primary for the file
     	
-    	// call the saveFileContent() on the successor and set isPrimary=true if logic above is true otherwise set isPrimary=false
-    	
-    	// increment counter
 		return counter;
     }
 	
@@ -114,14 +139,25 @@ public class FileManager {
 		// Task: Given a filename, find all the peers that hold a copy of this file
 		
 		// generate the N replicas from the filename by calling createReplicaFiles()
+		createReplicaFiles();
 		
 		// iterate over the replicas of the file
-		
-		// for each replica, do findSuccessor(replica) that returns successor s.
-		
-		// get the metadata (Message) of the replica from the successor (i.e., active peer) of the file
-		
-		// save the metadata in the set activeNodesforFile.
+		for(int i = 0; i < numReplicas; i++) {
+			
+			// for each replica, do findSuccessor(replica) that returns successor s.
+			BigInteger replica = replicafiles[i];
+			NodeInterface s = chordnode.findSuccessor(replica);
+			
+			// get the metadata (Message) of the replica from the successor (i.e., active peer) of the file
+			Map<BigInteger, Message> metadata = s.getFilesMetadata();
+			
+			// save the metadata in the set activeNodesforFile.
+			Message msg = metadata.get(replica);
+			
+			activeNodesforFile.add(msg);
+			
+		}
+
 		
 		return activeNodesforFile;
 	}
@@ -136,11 +172,17 @@ public class FileManager {
 		
 		// iterate over the activeNodesforFile
 		
-		// for each active peer (saved as Message)
-		
-		// use the primaryServer boolean variable contained in the Message class to check if it is the primary or not
-		
-		// return the primary when found (i.e., use Util.getProcessStub to get the stub and return it)
+		for(Message msg : activeNodesforFile) {
+			
+			// for each active peer (saved as Message)
+			
+			// use the primaryServer boolean variable contained in the Message class to check if it is the primary or not
+			if(msg.isPrimaryServer()) {
+				// return the primary when found (i.e., use Util.getProcessStub to get the stub and return it)
+				return Util.getProcessStub(msg.getNodeName(), msg.getPort());
+			}
+			
+		}
 		
 		return null; 
 	}
